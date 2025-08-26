@@ -23,11 +23,8 @@ typedef enum{
 }state_type;
 
 typedef struct{
-	GPIO_TypeDef* leds_port;
-	uint16_t led1_pin;
-	uint16_t led2_pin;
-	uint16_t led3_pin;
-	uint16_t led4_pin;
+	TIM_HandleTypeDef *tim_handler;
+	uint8_t user_step_size;
 }state_machine_configs;
 
 state_machine_handle state_machine_init(state_machine_configs* config);
