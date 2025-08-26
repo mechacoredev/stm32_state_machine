@@ -16,13 +16,15 @@ static void state_5_function(state_machine_handle dev);
 
 
 struct state_machine{
-	GPIO_TypeDef* leds_port;
-	uint16_t led1_pin;
-	uint16_t led2_pin;
-	uint16_t led3_pin;
-	uint16_t led4_pin;
+	TIM_HandleTypeDef *tim_handler;
+	uint32_t Channel1;
+	uint32_t Channel2;
+	uint32_t Channel3;
+	uint32_t Channel4;
 	state_type current_state;
-	uint8_t clockcount;
+	uint16_t step_size_compare;
+	uint16_t max_compare_value;
+	uint16_t current_pwm_compare;
 };
 
 static void (*state_table[])(state_machine_handle dev) = {
@@ -37,14 +39,25 @@ state_machine_handle state_machine_init(state_machine_configs* config){
 	state_machine_handle dev = (state_machine_handle)malloc(sizeof(struct state_machine));
 	if(dev==NULL) return NULL;
 
+	dev->tim_handler=config->tim_handler;
+	dev->Channel1=TIM_CHANNEL_1;
+	dev->Channel2=TIM_CHANNEL_2;
+	dev->Channel3=TIM_CHANNEL_3;
+	dev->Channel4=TIM_CHANNEL_4;
+	dev->max_compare_value=__HAL_TIM_GET_AUTORELOAD(dev->tim_handler);
+	dev->step_size_compare=(config->user_step_size*(dev->max_compare_value+1))/100;
 	dev->current_state=state_1;
-	dev->clockcount=0;
-	dev->leds_port=config->leds_port;
-	dev->led1_pin=config->led1_pin;
-	dev->led2_pin=config->led2_pin;
-	dev->led3_pin=config->led3_pin;
-	dev->led4_pin=config->led4_pin;
-	HAL_GPIO_WritePin(dev->leds_port, dev->led1_pin | dev->led2_pin | dev->led3_pin | dev->led4_pin, GPIO_PIN_RESET);
+	dev->current_pwm_compare=0;
+
+    HAL_TIM_PWM_Start(dev->tim_handler, dev->Channel1);
+    HAL_TIM_PWM_Start(dev->tim_handler, dev->Channel2);
+    HAL_TIM_PWM_Start(dev->tim_handler, dev->Channel3);
+    HAL_TIM_PWM_Start(dev->tim_handler, dev->Channel4);
+
+    __HAL_TIM_SET_COMPARE(dev->tim_handler, dev->Channel1, 0);
+    __HAL_TIM_SET_COMPARE(dev->tim_handler, dev->Channel2, 0);
+    __HAL_TIM_SET_COMPARE(dev->tim_handler, dev->Channel3, 0);
+    __HAL_TIM_SET_COMPARE(dev->tim_handler, dev->Channel4, 0);
 
 	return dev;
 }
@@ -53,42 +66,58 @@ void StateMachine_Run(state_machine_handle dev)
 {
     if (dev == NULL) return;
 
-    dev->clockcount++;
     state_table[dev->current_state](dev);
 }
 
 static void state_1_function(state_machine_handle dev){
-	if(dev->clockcount==1){
+	dev->current_pwm_compare+=dev->step_size_compare;
+	__HAL_TIM_SET_COMPARE(dev->tim_handler, dev->Channel1, dev->current_pwm_compare);
+	if(dev->current_pwm_compare+dev->step_size_compare>dev->max_compare_value){
+		dev->current_pwm_compare=0;
 		dev->current_state=state_2;
-		HAL_GPIO_WritePin(dev->leds_port, dev->led1_pin, GPIO_PIN_SET);
 	}
 }
 
 static void state_2_function(state_machine_handle dev){
-	if(dev->clockcount==2){
+	dev->current_pwm_compare+=dev->step_size_compare;
+	__HAL_TIM_SET_COMPARE(dev->tim_handler, dev->Channel2, dev->current_pwm_compare);
+	if(dev->current_pwm_compare+dev->step_size_compare>dev->max_compare_value){
+		dev->current_pwm_compare=0;
 		dev->current_state=state_3;
-		HAL_GPIO_WritePin(dev->leds_port, dev->led2_pin, GPIO_PIN_SET);
 	}
 }
 
 static void state_3_function(state_machine_handle dev){
-	if(dev->clockcount==3){
+	dev->current_pwm_compare+=dev->step_size_compare;
+	__HAL_TIM_SET_COMPARE(dev->tim_handler, dev->Channel3, dev->current_pwm_compare);
+	if(dev->current_pwm_compare+dev->step_size_compare>dev->max_compare_value){
+		dev->current_pwm_compare=0;
 		dev->current_state=state_4;
-		HAL_GPIO_WritePin(dev->leds_port, dev->led3_pin, GPIO_PIN_SET);
 	}
 }
 
 static void state_4_function(state_machine_handle dev){
-	if(dev->clockcount==4){
+	dev->current_pwm_compare+=dev->step_size_compare;
+	__HAL_TIM_SET_COMPARE(dev->tim_handler, dev->Channel4, dev->current_pwm_compare);
+	if(dev->current_pwm_compare+dev->step_size_compare>dev->max_compare_value){
 		dev->current_state=state_5;
-		HAL_GPIO_WritePin(dev->leds_port, dev->led4_pin, GPIO_PIN_SET);
 	}
 }
 
 static void state_5_function(state_machine_handle dev){
-	if(dev->clockcount==5){
+	if((int32_t)dev->current_pwm_compare - (int32_t)dev->step_size_compare < 0)
+	{
+		dev->current_pwm_compare=0;
+	}
+	else{
+		dev->current_pwm_compare-=dev->step_size_compare;
+	}
+	__HAL_TIM_SET_COMPARE(dev->tim_handler, dev->Channel1, dev->current_pwm_compare);
+	__HAL_TIM_SET_COMPARE(dev->tim_handler, dev->Channel2, dev->current_pwm_compare);
+	__HAL_TIM_SET_COMPARE(dev->tim_handler, dev->Channel3, dev->current_pwm_compare);
+	__HAL_TIM_SET_COMPARE(dev->tim_handler, dev->Channel4, dev->current_pwm_compare);
+	if(dev->current_pwm_compare==0)
+	{
 		dev->current_state=state_1;
-		HAL_GPIO_WritePin(dev->leds_port, dev->led1_pin | dev->led2_pin | dev->led3_pin | dev->led4_pin, GPIO_PIN_RESET);
-		dev->clockcount=0;
 	}
 }
