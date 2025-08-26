@@ -105,18 +105,12 @@ static void state_4_function(state_machine_handle dev){
 }
 
 static void state_5_function(state_machine_handle dev){
-	if((int32_t)dev->current_pwm_compare - (int32_t)dev->step_size_compare < 0)
-	{
-		dev->current_pwm_compare=0;
-	}
-	else{
-		dev->current_pwm_compare-=dev->step_size_compare;
-	}
+	dev->current_pwm_compare-=dev->step_size_compare;
 	__HAL_TIM_SET_COMPARE(dev->tim_handler, dev->Channel1, dev->current_pwm_compare);
 	__HAL_TIM_SET_COMPARE(dev->tim_handler, dev->Channel2, dev->current_pwm_compare);
 	__HAL_TIM_SET_COMPARE(dev->tim_handler, dev->Channel3, dev->current_pwm_compare);
 	__HAL_TIM_SET_COMPARE(dev->tim_handler, dev->Channel4, dev->current_pwm_compare);
-	if(dev->current_pwm_compare<=0)
+	if(dev->current_pwm_compare==0)
 	{
 		dev->current_state=state_1;
 	}
